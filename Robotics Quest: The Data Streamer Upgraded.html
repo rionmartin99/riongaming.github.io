@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Robotics Quest: The Data Streamer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #202028;
+            color: white;
+            font-family: 'Roboto', sans-serif;
+            overflow: hidden; /* Prevent scrolling */
+            touch-action: none; /* Prevent browser zoom/scroll gestures */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 16/9;
+            background: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .hud {
+            padding: 10px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px; /* Smaller font to fit more info */
+            color: #fff;
+            text-shadow: 2px 2px #000;
+            display: flex;
+            justify-content: space-between;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+        }
+
+        /* Question Modal */
+        #question-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 600px;
+            max-height: 90%;
+            background: rgba(0, 20, 40, 0.98);
+            border: 2px solid #00ffff;
+            border-radius: 10px;
+            padding: 20px;
+            display: none; /* Hidden by default */
+            pointer-events: auto;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+            text-align: center;
+            z-index: 200; /* High Z-index */
+            overflow-y: auto;
+        }
+
+        #question-modal h2 {
+            font-family: 'Press Start 2P', cursive;
+            color: #00ffff;
+            font-size: 12px;
+            margin-bottom: 15px;
+            line-height: 1.6;
+            text-transform: uppercase;
+        }
+
+        #question-feedback {
+            height: 20px;
+            margin-bottom: 10px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: white;
+        }
+
+        .option-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 6px 0;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Roboto', sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .option-btn:hover, .option-btn:active {
+            background: #00ffff;
+            color: #000;
+        }
+        
+        .option-btn.correct {
+            background-color: #00ff00 !important;
+            color: black !important;
+            border-color: #00ff00;
+        }
+
+        .option-btn.wrong {
+            background-color: #ff0000 !important;
+            color: white !important;
+            border-color: #ff0000;
+        }
+
+        /* Screens */
+        #start-screen, #game-over-screen, #victory-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 100; /* Ensure on top */
+            padding: 10px;
+            box-sizing: border-box;
+            overflow-y: auto; /* Allow scrolling on small screens */
+        }
+
+        /* Content wrapper to help with centering/scrolling */
+        .screen-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            color: #00ffff;
+            font-size: 20px; /* Slightly smaller for mobile */
+            text-align: center;
+            margin-bottom: 15px;
+            text-shadow: 4px 4px #ff00ff;
+            line-height: 1.4;
+        }
+
+        p {
+            font-size: 13px;
+            text-align: center;
+            max-width: 90%;
+            line-height: 1.5;
+            margin-bottom: 10px;
+            color: #ddd;
+        }
+        
+        .stats-box {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #fff;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            text-align: center;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #00ff00;
+            line-height: 2;
+        }
+
+        .instructions-box {
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid #00ffff;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            text-align: left;
+            font-size: 12px;
+            max-width: 95%;
+        }
+        
+        .instructions-box h3 {
+            font-family: 'Press Start 2P', cursive;
+            color: #ffd700;
+            font-size: 10px;
+            margin-top: 0;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .key-badge {
+            display: inline-block;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 2px 5px;
+            font-family: monospace;
+            font-weight: bold;
+            color: #fff;
+            margin: 0 2px;
+            font-size: 10px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: #ff0055;
+            color: white;
+            border: none;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 5px;
+            box-shadow: 0 4px #990033;
+            transition: transform 0.1s;
+            margin-top: 10px;
+            flex-shrink: 0; /* Prevent shrinking */
+            position: relative;
+            z-index: 101;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 #990033;
+        }
+
+        /* Mobile Controls */
+        #mobile-controls {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            height: 100px;
+            pointer-events: auto;
+            display: none; /* Shown via JS on touch devices */
+            justify-content: space-between;
+            padding: 0 15px;
+            box-sizing: border-box;
+            z-index: 50;
+        }
+
+        .control-btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            color: white;
+            user-select: none;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .control-btn:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .d-pad {
+            display: flex;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="hud">
+            <div>DATA: <span id="score-display">0</span>%</div>
+            <div>LIVES: <span id="lives-display" style="color:#ff0055">5</span></div>
+            <div>ENEMIES: <span id="enemies-display" style="color:#00ff00">0</span></div>
+            <div>SHIELD: <span id="shield-display">OFF</span></div>
+        </div>
+        
+        <div id="mobile-controls">
+            <div class="d-pad">
+                <div class="control-btn" id="btn-left">◀</div>
+                <div class="control-btn" id="btn-right">▶</div>
+            </div>
+            <div class="control-btn" id="btn-jump">▲</div>
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen">
+        <div class="screen-content">
+            <h1>ROBOTICS QUEST:<br>THE DATA STREAMER</h1>
+            
+            <div class="instructions-box">
+                <h3>MANUAL CONTROL OVERRIDE</h3>
+                <p>• Move: <span class="key-badge">←</span> <span class="key-badge">→</span> or D-Pad</p>
+                <p>• Jump: <span class="key-badge">SPACE</span> or <span class="key-badge">▲</span> (Double Tap for High Jump)</p>
+                <p>• Hit <b>Question Blocks</b> from below to answer!</p>
+                
+                <h3>MISSION BRIEF</h3>
+                <p>• <b>Obj:</b> Collect 20 Question Blocks.</p>
+                <p>• <b>Status:</b> Safe Ground Mode Active.</p>
+            </div>
+
+            <button class="btn" id="start-btn">INITIALIZE SYSTEM</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" style="display: none;">
+        <div class="screen-content">
+            <h1>SYSTEM FAILURE</h1>
+            <p>Too much noise in the signal.</p>
+            <div class="stats-box" id="game-over-stats">
+                <!-- Injected via JS -->
+            </div>
+            <button class="btn" id="restart-btn">REBOOT SYSTEM</button>
+        </div>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory-screen" style="display: none;">
+        <div class="screen-content">
+            <h1>UPLOAD COMPLETE</h1>
+            <p>You have mastered the Robotics Protocol.</p>
+            <div class="stats-box" id="victory-stats">
+                <!-- Injected via JS -->
+            </div>
+            <button class="btn" id="victory-restart-btn">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <!-- Question Modal -->
+    <div id="question-modal">
+        <h2 id="q-text">Question goes here?</h2>
+        <div id="question-feedback"></div>
+        <div id="q-options">
+            <!-- Buttons injected here -->
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * ROBOTICS QUEST: THE DATA STREAMER (MASTER EDITION v2.2)
+ * Engine: Custom Platformer Engine
+ * Update: Increased Chaos (More Enemies), Reduced Empty Space
+ */
+
+(function() {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let gameW, gameH; 
+
+    function resize() {
+        const container = document.getElementById('game-container');
+        gameW = canvas.width = container.clientWidth;
+        gameH = canvas.height = container.clientHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- CONFIG ---
+    const GRAVITY = 0.8;
+    const JUMP_FORCE = -14;
+    const MOVE_SPEED = 6;
+    const MAX_LIVES = 5; 
+    const TOTAL_LEVEL_WIDTH = 17000; // Drastically reduced from 30000 to eliminate empty road
+
+    // --- ASSETS & DATA ---
+    const questions = [
+        {
+            q: "1. A robot is designed to push heavy objects quickly. Which design factor should override the weight constraint?",
+            options: ["A) Material Selection (Polycarbonate)", "B) Size and Shape (Compact)", "C) Durability (Strong Structure)", "D) Locomotion Type (Tracked)"],
+            correct: 2 // C
+        },
+        {
+            q: "2. Which locomotion type is best for navigating steep, rocky terrain, dense mud, and thick underbrush?",
+            options: ["A) Wheeled (High efficiency)", "B) Tracked (Surface area)", "C) Legged (Adaptability)", "D) Standard Wheels (High grip)"],
+            correct: 2 // C
+        },
+        {
+            q: "3. For a simple, low-cost robot prototype on a flat table, why use Acrylic for the chassis?",
+            options: ["A) It is tough", "B) It is lightweight", "C) Low cost and easy to cut", "D) Superior structural rigidity"],
+            correct: 2 // C
+        },
+        {
+            q: "4. To prevent tipping while a tall manipulator arm is fully extended, what should engineers prioritize?",
+            options: ["A) Decrease Base of Support", "B) Move heavy components up", "C) Increase arm weight", "D) Lower Center of Gravity (COG)"],
+            correct: 3 // D
+        },
+        {
+            q: "5. If the Center of Gravity falls on the rear edge of the Base of Support, what happens if the robot accelerates up a slope?",
+            options: ["A) Robot stalls", "B) Robot tips over backward", "C) COG shifts forward", "D) Stability remains constant"],
+            correct: 1 // B
+        },
+        {
+            q: "6. An axle passes through only one hole in an acrylic chassis. What is the likely cause of poor performance?",
+            options: ["A) Chassis too flexible", "B) Lack of dual shaft support (Binding)", "C) Wheels too slippery", "D) COG too high"],
+            correct: 1 // B
+        },
+        {
+            q: "7. Which wheel type is necessary for rapid, precise sideways (strafing) movement?",
+            options: ["A) Standard Wheels", "B) Caster Wheels", "C) Omni Wheels", "D) Tracked Systems"],
+            correct: 2 // C
+        },
+        {
+            q: "8. A U-shaped chassis twists during sharp turns. What is the most effective engineering solution?",
+            options: ["A) Switch to steel", "B) Add diagonal cross-brace", "C) Loosen motor screws", "D) Replace with omni wheels"],
+            correct: 1 // B
+        },
+        {
+            q: "9. With limited funding, what is the best step to test a complex claw mechanism's size and layout?",
+            options: ["A) Assemble with final materials", "B) Skip prototyping", "C) Build low-fidelity prototype (Cardboard)", "D) Purchase electronics first"],
+            correct: 2 // C
+        },
+        {
+            q: "10. What is the primary functional risk of a wire bundle draped close to a spinning gear?",
+            options: ["A) Immediate short circuit", "B) Snagging/Damage to wire or parts", "C) Excessive heat generation", "D) Insulation melting over time"],
+            correct: 1 // B
+        },
+        {
+            q: "11. Why tighten fasteners loosely first, then perform a final tightening on a square chassis?",
+            options: ["A) Quick disassembly later", "B) Motor clearance", "C) Allow adjustments for squaring/alignment", "D) Prevent thread stripping"],
+            correct: 2 // C
+        },
+        {
+            q: "12. What is the immediate safety risk of using a drill press on aluminum without safety glasses?",
+            options: ["A) Drill bit slip", "B) Sharp metal filings in eyes", "C) Burns from heat", "D) Drill bit breakage"],
+            correct: 1 // B
+        },
+        {
+            q: "13. With limited budget and time, which design approach maximizes chances of scoring?",
+            options: ["A) Highly modular design", "B) KISS principle (Simple, Robust)", "C) Prioritize complexity", "D) Fully integrated design"],
+            correct: 1 // B
+        },
+        {
+            q: "14. What advantage does a modular design offer during limited repair time between matches?",
+            options: ["A) Lighter weight", "B) Quickly swap damaged module", "C) Integrated structure protection", "D) Simple wiring"],
+            correct: 1 // B
+        },
+        {
+            q: "15. What is the likely cause of added size and weight in a highly modular space probe?",
+            options: ["A) Complex programming", "B) Connectors and robustness of interfaces", "C) Low Center of Gravity", "D) Inclusion of prototypes"],
+            correct: 1 // B
+        },
+        {
+            q: "16. What is the primary risk of twisting wires together without electrical tape?",
+            options: ["A) Inefficient conduction", "B) Short circuit risk (Exposed conductor)", "C) Immediate copper corrosion", "D) Increased resistance"],
+            correct: 1 // B
+        },
+        {
+            q: "17. What information does a schematic provide that is NOT sufficient for physical soldering?",
+            options: ["A) Total current draw", "B) Logical connections", "C) Exact physical arrangement/spacing", "D) Variable values"],
+            correct: 2 // C
+        },
+        {
+            q: "18. How do you fix a 'cold' (dull gray, lumpy) solder joint?",
+            options: ["A) Reverse component", "B) Cut the bridge", "C) Reheat until shiny", "D) Add more solder"],
+            correct: 2 // C
+        },
+        {
+            q: "19. If you forget to clean the copper board with alcohol before drawing traces, what happens?",
+            options: ["A) Etchant neutralized", "B) Ink won't adhere (Broken traces)", "C) Etching speeds up", "D) Acetone fails"],
+            correct: 1 // B
+        },
+        {
+            q: "20. What is the critical safety mistake of using Ferric Chloride in a metal baking pan?",
+            options: ["A) Not enough agitation", "B) Leftover oils", "C) Reaction with metal tray (Fumes)", "D) Wrong marker type"],
+            correct: 2 // C
+        }
+    ];
+
+    // --- GAME STATE ---
+    let gameState = 'START'; 
+    let lives = MAX_LIVES;
+    let cameraX = 0;
+    let isInvincible = false;
+    let invincibleTimer = 0;
+    let enemiesDefeated = 0;
+    let questionsAnswered = 0;
+    let answering = false; // Prevents multiple clicks
+    
+    // Inputs
+    const keys = { left: false, right: false, up: false };
+
+    // --- ENTITIES ---
+    class Player {
+        constructor() {
+            this.w = 30;
+            this.h = 40;
+            this.x = 100;
+            this.y = 0;
+            this.vx = 0;
+            this.vy = 0;
+            this.grounded = false;
+            this.color = '#00ffff';
+            this.flashTimer = 0;
+            this.jumps = 0;
+            this.jumpLocked = false;
+        }
+
+        update() {
+            // Horizontal Movement (Direct Control)
+            if (keys.left) this.vx = -MOVE_SPEED;
+            else if (keys.right) this.vx = MOVE_SPEED;
+            else this.vx = 0;
+
+            // Jump Logic with Double Jump
+            if (keys.up) {
+                if (!this.jumpLocked) {
+                    if (this.grounded) {
+                        this.vy = JUMP_FORCE;
+                        this.grounded = false;
+                        this.jumps = 1;
+                        this.jumpLocked = true;
+                    } else if (this.jumps < 2) {
+                        this.vy = JUMP_FORCE; // Double jump!
+                        this.jumps++;
+                        this.jumpLocked = true;
+                    }
+                }
+            } else {
+                this.jumpLocked = false;
+            }
+
+            // Gravity
+            this.vy += GRAVITY;
+
+            // Apply Velocity
+            this.x += this.vx;
+            this.y += this.vy;
+
+            // World Boundaries
+            if (this.x < 0) this.x = 0;
+            if (this.x > TOTAL_LEVEL_WIDTH - this.w) this.x = TOTAL_LEVEL_WIDTH - this.w;
+            
+            // Safety Floor (In case of physics clip)
+            if (this.y > gameH + 50) {
+                this.y = gameH - 200;
+                this.vy = 0;
+            }
+
+            // I-Frame Logic
+            if (isInvincible || this.flashTimer > 0) {
+                if (isInvincible) {
+                    invincibleTimer--;
+                    if (invincibleTimer <= 0) {
+                        isInvincible = false;
+                        document.getElementById('shield-display').innerText = "OFF";
+                        document.getElementById('shield-display').style.color = "white";
+                    }
+                    this.color = Math.floor(Date.now() / 100) % 2 === 0 ? '#ffff00' : '#00ffff';
+                } else if (this.flashTimer > 0) {
+                    this.flashTimer--;
+                    this.color = Math.floor(Date.now() / 100) % 2 === 0 ? '#ff0055' : '#00ffff';
+                }
+            } else {
+                this.color = '#00ffff';
+            }
+            
+            // Win Condition
+            if (this.x > TOTAL_LEVEL_WIDTH - 100) {
+                gameVictory();
+            }
+        }
+
+        draw(ctx) {
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x, this.y, this.w, this.h);
+            
+            // Eyes (Directional)
+            ctx.fillStyle = '#000';
+            let eyeOff = this.vx < 0 ? 5 : (this.vx > 0 ? 20 : 12);
+            ctx.fillRect(this.x + eyeOff, this.y + 10, 5, 5);
+        }
+    }
+
+    class Platform {
+        constructor(x, y, w, h, type = 'normal', qIndex = -1) {
+            this.x = x;
+            this.y = y;
+            this.w = w;
+            this.h = h;
+            this.type = type; // 'normal', 'question', 'floor', 'lava'
+            this.active = true;
+            this.qIndex = qIndex; // Which question to ask
+        }
+
+        draw(ctx) {
+            if (this.type === 'floor') {
+                ctx.fillStyle = '#222';
+                ctx.fillRect(this.x, this.y, this.w, this.h);
+                // Top Green Line
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x + this.w, this.y);
+                ctx.stroke();
+            } 
+            else if (this.type === 'normal') {
+                ctx.fillStyle = '#3a3a4a';
+                ctx.fillRect(this.x, this.y, this.w, this.h);
+                ctx.strokeStyle = '#55ff55';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(this.x, this.y, this.w, this.h);
+            } 
+            else if (this.type === 'question') {
+                if (this.active) {
+                    ctx.fillStyle = '#ffd700'; // Gold
+                    ctx.fillRect(this.x, this.y, this.w, this.h);
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 20px "Press Start 2P"';
+                    ctx.fillText('?', this.x + 10, this.y + 30);
+                } else {
+                    ctx.fillStyle = '#554400'; // Dim Gold
+                    ctx.fillRect(this.x, this.y, this.w, this.h);
+                }
+                ctx.strokeStyle = '#fff';
+                ctx.strokeRect(this.x, this.y, this.w, this.h);
+            }
+        }
+    }
+
+    class Enemy {
+        constructor(x, y, type) {
+            this.x = x;
+            this.y = y;
+            this.w = 30;
+            this.h = 30;
+            this.type = type; // 'walker', 'shooter', 'flyer'
+            this.startX = x;
+            this.startY = y;
+            this.range = 150;
+            this.dir = 1;
+            this.shootTimer = Math.random() * 100;
+            this.flyOffset = Math.random() * Math.PI * 2;
+        }
+
+        update() {
+            if (this.type === 'flyer') {
+                this.flyOffset += 0.05;
+                this.y = this.startY + Math.sin(this.flyOffset) * 50;
+                this.x += this.dir * 1;
+                if (this.x > this.startX + this.range) this.dir = -1;
+                if (this.x < this.startX - this.range) this.dir = 1;
+            } else {
+                // Ground Patrol
+                this.x += this.dir * 1.5;
+                if (this.x > this.startX + this.range) this.dir = -1;
+                if (this.x < this.startX - this.range) this.dir = 1;
+            }
+
+            if (this.type === 'shooter') {
+                this.shootTimer--;
+                if (this.shootTimer <= 0) {
+                    // Shoot towards player if nearby
+                    let dist = player.x - this.x;
+                    if (Math.abs(dist) < 700) { // Range
+                        let dir = dist > 0 ? 1 : -1;
+                        lasers.push(new Laser(this.x + 15, this.y + 15, dir * 5));
+                        this.shootTimer = 150; 
+                    }
+                }
+            }
+        }
+
+        draw(ctx) {
+            if (this.type === 'shooter') {
+                ctx.fillStyle = '#ff5500'; // Orange
+                ctx.beginPath();
+                ctx.moveTo(this.x + 15, this.y);
+                ctx.lineTo(this.x + 30, this.y + 30);
+                ctx.lineTo(this.x, this.y + 30);
+                ctx.fill();
+            } else if (this.type === 'flyer') {
+                 ctx.fillStyle = '#aa00ff'; // Purple
+                 ctx.beginPath();
+                 ctx.arc(this.x + 15, this.y + 15, 12, 0, Math.PI * 2);
+                 ctx.fill();
+                 // Wings
+                 ctx.fillStyle = '#ddaa00';
+                 if (Math.sin(this.flyOffset * 5) > 0) {
+                     ctx.fillRect(this.x - 5, this.y, 5, 10);
+                     ctx.fillRect(this.x + 30, this.y, 5, 10);
+                 } else {
+                     ctx.fillRect(this.x - 5, this.y + 5, 5, 10);
+                     ctx.fillRect(this.x + 30, this.y + 5, 5, 10);
+                 }
+            } else {
+                ctx.fillStyle = '#ff0055'; // Red walker
+                ctx.beginPath();
+                ctx.arc(this.x + 15, this.y + 15, 15, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+
+    class Laser {
+        constructor(x, y, vx) {
+            this.x = x;
+            this.y = y;
+            this.w = 15;
+            this.h = 5;
+            this.vx = vx;
+            this.life = 100;
+        }
+        update() {
+            this.x += this.vx;
+            this.life--;
+        }
+        draw(ctx) {
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(this.x, this.y, this.w, this.h);
+        }
+    }
+
+    // --- INSTANCES ---
+    let player;
+    let platforms = [];
+    let enemies = [];
+    let lasers = [];
+
+    // --- LEVEL DESIGN GENERATOR ---
+    function buildLevel() {
+        platforms = [];
+        enemies = [];
+        lasers = [];
+
+        let floorY = gameH - 60;
+
+        // 1. THE CONTINUOUS FLOOR
+        platforms.push(new Platform(-100, floorY, TOTAL_LEVEL_WIDTH + 200, 400, 'floor'));
+
+        // --- HELPER FUNCTIONS ---
+        // xRel is relative to current zone cursor
+        
+        let cursorX = 0;
+
+        function addPlat(x, yOff, w, h) {
+            platforms.push(new Platform(cursorX + x, floorY - yOff, w, h, 'normal'));
+        }
+        
+        function addQ(x, yOff, qIdx) {
+            // yOff is how high above floor.
+            // 40 is height of block.
+            platforms.push(new Platform(cursorX + x, floorY - yOff, 40, 40, 'question', qIdx));
+        }
+
+        function addEnemy(x, yOff, type) {
+            // Adjusted yOff so enemies sit IN the ground slightly, not float
+            // yOff 30 puts bottom exactly on floor line. 
+            // We use 25 to bury them slightly so they don't look like they are floating.
+            let safeY = yOff;
+            if (yOff === 30) safeY = 25; 
+            enemies.push(new Enemy(cursorX + x, floorY - safeY, type));
+        }
+
+        // --- ZONE 1: WARM UP ---
+        cursorX = 0;
+        addQ(600, 150, 0); // Q1 Simple Jump
+        addEnemy(300, 150, 'flyer'); // Added Chaos
+        addEnemy(800, 100, 'flyer'); // Added Chaos
+        addEnemy(1000, 30, 'walker');
+        addPlat(1200, 100, 200, 40);
+        addQ(1300, 220, 1); // Q2 On Platform
+
+        // --- ZONE 2: STAIRS ---
+        cursorX = 2000;
+        addPlat(0, 80, 100, 40);
+        addPlat(200, 160, 100, 40);
+        addPlat(400, 240, 100, 40);
+        addQ(430, 360, 2); // Q3 High
+        addEnemy(300, 30, 'shooter');
+        addEnemy(600, 200, 'flyer'); // Added Chaos
+        
+        addPlat(800, 120, 200, 40);
+        addQ(900, 240, 3); // Q4
+        addEnemy(1200, 30, 'walker');
+        addQ(1400, 150, 4); // Q5 Low jump
+
+        // --- ZONE 3: THE BRIDGE ---
+        cursorX = 4000;
+        // Long platform bridge
+        addPlat(100, 200, 1000, 40);
+        addEnemy(300, 240, 'walker'); // On bridge
+        addEnemy(600, 240, 'shooter'); // On bridge
+        
+        addEnemy(200, 350, 'flyer'); // Added Chaos (Air raid)
+        addEnemy(800, 350, 'flyer'); // Added Chaos (Air raid)
+        
+        addQ(500, 350, 5); // Q6 High above bridge
+        
+        // Ground enemies below bridge
+        addEnemy(400, 30, 'walker');
+        addEnemy(800, 30, 'walker');
+        
+        addQ(1300, 150, 6); // Q7
+
+        // --- ZONE 4: PYRAMID ---
+        cursorX = 6000;
+        addPlat(0, 80, 600, 40);
+        addPlat(100, 160, 400, 40);
+        addPlat(200, 240, 200, 40);
+        
+        addEnemy(400, 30, 'shooter'); // Added Chaos (Pyramid guard)
+        addEnemy(50, 30, 'walker');   // Added Chaos
+        addEnemy(550, 30, 'walker');  // Added Chaos
+        
+        addQ(280, 360, 7); // Q8 Peak
+        
+        addEnemy(800, 150, 'flyer');
+        addQ(1000, 150, 8); // Q9
+
+        // --- ZONE 5: HOPPERS ---
+        cursorX = 8000;
+        addPlat(100, 100, 80, 40);
+        addPlat(300, 150, 80, 40);
+        addPlat(500, 100, 80, 40);
+        addQ(320, 270, 9); // Q10
+        addEnemy(300, 30, 'shooter'); // Guarding below
+        addEnemy(600, 300, 'flyer');  // Added Chaos
+
+        addPlat(800, 250, 300, 40);
+        addQ(950, 370, 10); // Q11
+        
+        addEnemy(1200, 30, 'walker');
+        addQ(1400, 150, 11); // Q12
+
+        // --- ZONE 6: TALL WALLS ---
+        cursorX = 10000;
+        addPlat(100, 150, 40, 200); // Wall
+        addPlat(300, 250, 40, 200); // Wall
+        addQ(200, 120, 12); // Q13 Between walls low
+        
+        addEnemy(500, 200, 'flyer');
+        addEnemy(400, 30, 'shooter'); // Added Chaos
+        addQ(600, 200, 13); // Q14
+        
+        addPlat(900, 100, 200, 40);
+        addQ(1000, 220, 14); // Q15
+
+        // --- ZONE 7: THE GAUNTLET ---
+        cursorX = 12000;
+        addEnemy(50, 200, 'flyer'); // Added Chaos
+        addEnemy(200, 30, 'shooter');
+        addEnemy(500, 30, 'shooter');
+        addEnemy(600, 30, 'walker'); // Added Chaos
+        addEnemy(700, 30, 'walker'); // Added Chaos
+        
+        addQ(350, 180, 15); // Q16
+        
+        addPlat(800, 200, 100, 40);
+        addPlat(1000, 200, 100, 40);
+        addEnemy(1100, 30, 'shooter'); // Added Chaos (Sniper)
+        addQ(900, 320, 16); // Q17 Between plats high
+        
+        // --- ZONE 8: END GAME ---
+        cursorX = 14000;
+        addEnemy(100, 30, 'walker');
+        addEnemy(200, 200, 'flyer');
+        addEnemy(500, 250, 'flyer'); // Added Chaos
+        addEnemy(700, 250, 'flyer'); // Added Chaos
+        
+        addQ(300, 150, 17); // Q18
+        
+        addPlat(600, 150, 100, 40);
+        addPlat(800, 300, 100, 40); // High perch
+        addQ(830, 420, 18); // Q19 High up
+
+        addEnemy(1000, 250, 'flyer'); // Final wave
+        addEnemy(1100, 200, 'flyer'); // Final wave
+        addEnemy(1200, 30, 'shooter');
+        addQ(1400, 150, 19); // Q20 Final
+
+        // Finish Line
+        platforms.push(new Platform(TOTAL_LEVEL_WIDTH - 500, floorY, 500, 400, 'floor'));
+    }
+
+    // --- LOGIC ---
+
+    function initGame() {
+        lives = MAX_LIVES;
+        isInvincible = false;
+        enemiesDefeated = 0;
+        questionsAnswered = 0;
+        
+        buildLevel();
+        
+        player = new Player();
+        // Reset player to start
+        player.x = 100;
+        player.y = gameH - 200;
+
+        gameState = 'PLAYING';
+        
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('game-over-screen').style.display = 'none';
+        document.getElementById('victory-screen').style.display = 'none';
+
+        if ('ontouchstart' in window) {
+            document.getElementById('mobile-controls').style.display = 'flex';
+        }
+
+        gameLoop();
+    }
+
+    function checkCollisions() {
+        player.grounded = false;
+
+        // PLATFORMS
+        for (let p of platforms) {
+            // AABB
+            if (player.x < p.x + p.w && player.x + player.w > p.x &&
+                player.y < p.y + p.h && player.y + player.h > p.y) {
+                
+                let ox = (player.x + player.w/2) - (p.x + p.w/2);
+                let oy = (player.y + player.h/2) - (p.y + p.h/2);
+                let hWidths = (player.w + p.w) / 2;
+                let hHeights = (player.h + p.h) / 2;
+                
+                let colX = hWidths - Math.abs(ox);
+                let colY = hHeights - Math.abs(oy);
+
+                if (colX < colY) {
+                    // Horizontal Collision
+                    if (ox < 0) player.x -= colX; else player.x += colX;
+                    player.vx = 0;
+                } else {
+                    // Vertical Collision
+                    if (oy < 0) {
+                        // Landed on top
+                        player.y -= colY;
+                        player.vy = 0;
+                        player.grounded = true;
+                        player.jumps = 0; // Reset jumps on landing
+                    } else {
+                        // Hit Head
+                        player.y += colY;
+                        player.vy = 0;
+                        if (p.type === 'question' && p.active) {
+                            triggerQuestion(p);
+                        }
+                    }
+                }
+            }
+        }
+
+        // ENEMIES
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            let e = enemies[i];
+            let dist = Math.hypot((player.x + 15) - (e.x + 15), (player.y + 20) - (e.y + 15));
+            if (dist < 30) {
+                if (isInvincible) {
+                    enemies.splice(i, 1);
+                    enemiesDefeated++;
+                    updateHUD();
+                } else {
+                    takeDamage();
+                }
+            }
+        }
+
+        // LASERS
+        for (let i = lasers.length - 1; i >= 0; i--) {
+            let l = lasers[i];
+            if (l.x < player.x + player.w && l.x + l.w > player.x &&
+                l.y < player.y + player.h && l.y + l.h > player.y) {
+                takeDamage();
+                lasers.splice(i, 1);
+            }
+        }
+    }
+
+    function takeDamage() {
+        if (isInvincible || player.flashTimer > 0) return;
+        
+        lives--;
+        if (lives <= 0) {
+            gameOver();
+            return;
+        }
+
+        // Normal hit
+        player.flashTimer = 120;
+        player.vy = -10; // Knockback
+        updateHUD();
+    }
+
+    function triggerQuestion(block) {
+        if (gameState === 'QUESTION') return;
+        gameState = 'QUESTION';
+        answering = false; // Reset answering state
+        block.active = false;
+        
+        const qData = questions[block.qIndex];
+        // Fallback if index error
+        const data = qData ? qData : questions[0];
+
+        const modal = document.getElementById('question-modal');
+        document.getElementById('q-text').innerText = data.q;
+        
+        // Reset Feedback
+        const feedback = document.getElementById('question-feedback');
+        feedback.innerText = "";
+        
+        const qOptions = document.getElementById('q-options');
+        qOptions.innerHTML = '';
+        
+        data.options.forEach((opt, idx) => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            btn.innerText = opt;
+            btn.onclick = (e) => handleAnswer(e.target, idx === data.correct);
+            qOptions.appendChild(btn);
+        });
+        
+        modal.style.display = 'block';
+    }
+
+    function handleAnswer(btnElement, isCorrect) {
+        if (answering) return; // Prevent double clicks
+        answering = true;
+        
+        const feedback = document.getElementById('question-feedback');
+
+        if (isCorrect) {
+            btnElement.classList.add('correct');
+            feedback.style.color = "#00ff00";
+            feedback.innerText = "ACCESS GRANTED";
+            questionsAnswered++;
+            activatePowerUp();
+            
+            // Wait briefly then close
+            setTimeout(() => {
+                document.getElementById('question-modal').style.display = 'none';
+                gameState = 'PLAYING';
+                answering = false;
+            }, 600);
+        } else {
+            btnElement.classList.add('wrong');
+            feedback.style.color = "#ff0000";
+            feedback.innerText = "ACCESS DENIED - SIGNAL CORRUPT";
+            
+            // Wait longer to show failure
+            setTimeout(() => {
+                document.getElementById('question-modal').style.display = 'none';
+                gameState = 'PLAYING';
+                answering = false;
+            }, 1200);
+        }
+    }
+
+    function activatePowerUp() {
+        isInvincible = true;
+        invincibleTimer = 600; 
+        const shieldSpan = document.getElementById('shield-display');
+        shieldSpan.innerText = "ACTIVE";
+        shieldSpan.style.color = "#ffff00";
+    }
+
+    function updateHUD() {
+        let pct = Math.floor((player.x / TOTAL_LEVEL_WIDTH) * 100);
+        document.getElementById('score-display').innerText = Math.min(pct, 100);
+        document.getElementById('lives-display').innerText = lives;
+        document.getElementById('enemies-display').innerText = enemiesDefeated;
+    }
+
+    function gameOver() {
+        gameState = 'GAMEOVER';
+        document.getElementById('game-over-screen').style.display = 'flex';
+        document.getElementById('game-over-stats').innerHTML = `
+            QUESTIONS: ${questionsAnswered} / 20<br>
+            ENEMIES DEFEATED: ${enemiesDefeated}
+        `;
+    }
+
+    function gameVictory() {
+        gameState = 'GAMEOVER';
+        document.getElementById('victory-screen').style.display = 'flex';
+        document.getElementById('victory-stats').innerHTML = `
+            QUESTIONS: ${questionsAnswered} / 20<br>
+            ENEMIES DEFEATED: ${enemiesDefeated}<br>
+            LIVES REMAINING: ${lives}
+        `;
+    }
+
+    function gameLoop() {
+        if (gameState !== 'PLAYING') {
+            if (gameState === 'PLAYING') requestAnimationFrame(gameLoop);
+            if (gameState === 'QUESTION') {
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+            return;
+        }
+
+        // UPDATE
+        player.update();
+        enemies.forEach(e => e.update());
+        lasers.forEach((l, i) => {
+            l.update();
+            if(l.life <= 0) lasers.splice(i, 1);
+        });
+        checkCollisions();
+        updateHUD();
+
+        // CAMERA logic
+        // Center camera on player, but clamp to world bounds
+        cameraX = player.x - gameW / 2;
+        if (cameraX < 0) cameraX = 0;
+        if (cameraX > TOTAL_LEVEL_WIDTH - gameW) cameraX = TOTAL_LEVEL_WIDTH - gameW;
+
+        // DRAW
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function draw() {
+        // Clear background (Static UI layer is HTML, Canvas is game world)
+        ctx.fillStyle = '#202028';
+        ctx.fillRect(0, 0, gameW, gameH);
+
+        ctx.save();
+        ctx.translate(-cameraX, 0);
+
+        // Draw World Grid (Parallax-ish)
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        // Optimization: Only draw grid lines in view
+        let startGrid = Math.floor(cameraX / 100) * 100;
+        let endGrid = startGrid + gameW + 100;
+        
+        for(let x = startGrid; x < endGrid; x+=100) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, gameH);
+            ctx.stroke();
+        }
+
+        // Draw platforms only in view for performance
+        platforms.forEach(p => {
+            if (p.x + p.w > cameraX && p.x < cameraX + gameW) {
+                p.draw(ctx);
+            }
+        });
+        
+        enemies.forEach(e => {
+            if (e.x + 30 > cameraX && e.x < cameraX + gameW) {
+                e.draw(ctx);
+            }
+        });
+
+        lasers.forEach(l => l.draw(ctx));
+        player.draw(ctx);
+        
+        // End Flag
+        ctx.fillStyle = '#00ff00';
+        ctx.fillRect(TOTAL_LEVEL_WIDTH - 50, gameH - 200, 50, 200);
+
+        ctx.restore();
+    }
+
+    // --- CONTROLS ---
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'ArrowLeft') keys.left = true;
+        if (e.code === 'ArrowRight') keys.right = true;
+        if (e.code === 'ArrowUp' || e.code === 'Space') keys.up = true;
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'ArrowLeft') keys.left = false;
+        if (e.code === 'ArrowRight') keys.right = false;
+        if (e.code === 'ArrowUp' || e.code === 'Space') keys.up = false;
+    });
+
+    // Touch
+    const btnLeft = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
+    const btnJump = document.getElementById('btn-jump');
+    const addTouch = (elem, key) => {
+        elem.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
+        elem.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
+    };
+    addTouch(btnLeft, 'left');
+    addTouch(btnRight, 'right');
+    addTouch(btnJump, 'up');
+
+    document.getElementById('start-btn').addEventListener('click', initGame);
+    document.getElementById('restart-btn').addEventListener('click', initGame);
+    document.getElementById('victory-restart-btn').addEventListener('click', initGame);
+
+})();
+</script>
+</body>
+</html>
